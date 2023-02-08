@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: networking-app
+  name: app
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app: networking-app # this needs to match the pods we are giving access to
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix # match everything
+        backend:
+          service:
+            name: app
+            port:
+              number: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    app: networking-app
+spec: 
+  replicas: 2
+  selector:
+    matchLabels:
+      app: networking-app
+  template:
+    metadata:
+      labels:
+        app: networking-app
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.15.8
+        ports:
+        - name: http
+          containerPort: 80

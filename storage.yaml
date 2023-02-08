@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-info
+data:
+  ENV: development
+  config.ini: |
+    debug=true
+    log_level=3
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: sample-pv
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain # What to do with the volume data after is no longer bound to a claim
+  hostPath:
+    path: /tmp/sample-pv
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sample-pv-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Mi # asks for a volume of at least 100Mi, you may get a larger volume
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo
+spec:
+  selector:
+    matchLabels:
+      app: echo
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: echo
+    spec:
+      volumes:
+        - name: task-pv-storage
+          persistentVolumeClaim:
+            claimName: sample-pv-claim
+        - name: config
+          configMap:
+            name: config-info
+            items:
+            - key: config.ini
+              path: config.ini
+      containers:
+      - image: busybox
+        name: echo
+        env:
+          - name: ENV
+            valueFrom:
+              configMapKeyRef:
+                name: config-info
+                key: ENV
+        volumeMounts:
+          - mountPath: "/data"
+            name: task-pv-storage
+          - mountPath: "/etc/config"
+            name: config
+        command: ["ping", "127.0.0.1"]
